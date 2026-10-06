@@ -1,0 +1,77 @@
+/* banner animation + fade, loads after detail.css so it overrides it */
+
+.trek .hero {
+  position: relative;
+  overflow: hidden;
+}
+
+/* image fades in, then slowly zooms in the background */
+.trek .hero-img {
+  opacity: 0;
+  transform: scale(1.12);
+  animation:
+    heroFadeIn 1.4s ease-out forwards,
+    heroZoom 18s ease-out forwards;
+}
+
+/* dark fade on top of the image: stronger at the bottom so the text is easy to read */
+.trek .hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.15) 0%,
+    rgba(0, 0, 0, 0.1) 35%,
+    rgba(0, 0, 0, 0.75) 100%
+  );
+  animation: heroFadeIn 1.4s ease-out both;
+}
+
+/* text sits above the fade and slides up one piece at a time */
+.trek .hero-inner {
+  position: relative;
+  z-index: 2;
+}
+
+.trek .hero-region,
+.trek .hero h1,
+.trek .hero .chips {
+  opacity: 0;
+  transform: translateY(24px);
+  animation: heroRise 0.9s ease-out forwards;
+}
+
+.trek .hero-region { animation-delay: 0.3s; }
+.trek .hero h1     { animation-delay: 0.5s; }
+.trek .hero .chips { animation-delay: 0.75s; }
+
+@keyframes heroFadeIn {
+  to { opacity: 1; }
+}
+
+@keyframes heroZoom {
+  to { transform: scale(1); }
+}
+
+@keyframes heroRise {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* people who turn off animations in their OS settings get a static banner */
+@media (prefers-reduced-motion: reduce) {
+  .trek .hero-img,
+  .trek .hero::after,
+  .trek .hero-region,
+  .trek .hero h1,
+  .trek .hero .chips {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

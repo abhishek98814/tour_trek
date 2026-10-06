@@ -1,0 +1,555 @@
+from django.core.management.base import BaseCommand
+from django.contrib.auth import get_user_model
+from treks.models import Trek, Category as TrekCategory, TrekItinerary, TrekAvailability
+from tour.models import Tour, TourCategory, TourItinerary, TourAvailability
+from datetime import date, timedelta
+import random
+
+User = get_user_model()
+
+
+class Command(BaseCommand):
+    help = 'Seed database with sample treks, tours and categories'
+
+    def handle(self, *args, **kwargs):
+        self.stdout.write('🌱 Seeding data...')
+
+        # Create admin user if not exists
+        admin, created = User.objects.get_or_create(
+            username='admin',
+            defaults={
+                'email': 'admin@treknepal.com',
+                'role': 'admin',
+                'is_staff': True,
+                'is_superuser': True,
+                'phone': '+9779800000000',
+            }
+        )
+        if created:
+            admin.set_password('admin123')
+            admin.save()
+            self.stdout.write('✅ Admin user created — username: admin, password: admin123')
+
+        # Create guide user
+        guide, created = User.objects.get_or_create(
+            username='guide_ram',
+            defaults={
+                'email': 'ram@treknepal.com',
+                'role': 'guide',
+                'phone': '+9779800000001',
+            }
+        )
+        if created:
+            guide.set_password('guide123')
+            guide.save()
+            self.stdout.write('✅ Guide user created — username: guide_ram, password: guide123')
+
+        # =====================
+        # TREK CATEGORIES
+        # =====================
+        trek_categories = [
+            {'name': 'High Altitude', 'slug': 'high-altitude', 'icon': '🏔️'},
+            {'name': 'Cultural', 'slug': 'cultural-trek', 'icon': '🛕'},
+            {'name': 'Wildlife', 'slug': 'wildlife-trek', 'icon': '🐆'},
+            {'name': 'Valley Trek', 'slug': 'valley-trek', 'icon': '🌿'},
+        ]
+        for cat_data in trek_categories:
+            cat, created = TrekCategory.objects.get_or_create(
+                slug=cat_data['slug'],
+                defaults={
+                    'name': cat_data['name'],
+                    'icon': cat_data['icon'],
+                    'description': f"{cat_data['name']} treks in Nepal",
+                }
+            )
+            if created:
+                self.stdout.write(f'  ✅ Trek category: {cat.name}')
+
+        high_alt = TrekCategory.objects.get(slug='high-altitude')
+        valley = TrekCategory.objects.get(slug='valley-trek')
+        cultural = TrekCategory.objects.get(slug='cultural-trek')
+
+        # =====================
+        # TREKS
+        # =====================
+        treks_data = [
+            {
+                'title': 'Everest Base Camp Trek',
+                'slug': 'everest-base-camp',
+                'description': 'The most iconic trek in the world. Walk through Sherpa villages, ancient monasteries and stunning Himalayan landscapes to reach the base of the world\'s highest mountain at 5,364m.',
+                'highlight': 'Standing at Everest Base Camp • Kala Patthar sunrise • Sherpa culture • Namche Bazaar',
+                'category': high_alt,
+                'difficulty': 'difficult',
+                'duration_days': 14,
+                'max_altitude': 5364,
+                'distance_km': 130,
+                'max_group_size': 12,
+                'min_age': 16,
+                'start_point': 'Lukla',
+                'end_point': 'Lukla',
+                'region': 'Khumbu',
+                'price_per_person': 1200,
+                'discount_percent': 10,
+                'best_season': 'autumn',
+                'tims_required': True,
+                'permit_info': 'Sagarmatha National Park permit NPR 3000 + TIMS card NPR 2000',
+                'gear_list': 'Down jacket, sleeping bag -20C, trekking poles, crampons',
+                'included': 'All meals, accommodation, guide, porter, permits',
+                'excluded': 'International flights, travel insurance, personal gear',
+                'status': 'active',
+                'is_featured': True,
+                'average_rating': 4.9,
+                'total_bookings': 245,
+            },
+            {
+                'title': 'Annapurna Circuit Trek',
+                'slug': 'annapurna-circuit',
+                'description': 'One of the world\'s classic treks, circumnavigating the Annapurna massif through diverse landscapes from subtropical forests to high alpine terrain, crossing the Thorong La pass at 5,416m.',
+                'highlight': 'Thorong La Pass • Muktinath Temple • Diverse landscapes • Pokhara lakeside',
+                'category': high_alt,
+                'difficulty': 'moderate',
+                'duration_days': 12,
+                'max_altitude': 5416,
+                'distance_km': 160,
+                'max_group_size': 14,
+                'min_age': 14,
+                'start_point': 'Besisahar',
+                'end_point': 'Nayapul',
+                'region': 'Annapurna',
+                'price_per_person': 900,
+                'discount_percent': 15,
+                'best_season': 'autumn',
+                'tims_required': True,
+                'permit_info': 'ACAP permit NPR 3000 + TIMS card NPR 2000',
+                'gear_list': 'Warm layers, rain gear, trekking poles, good boots',
+                'included': 'All meals, teahouse accommodation, guide, permits',
+                'excluded': 'Flights, insurance, personal expenses',
+                'status': 'active',
+                'is_featured': True,
+                'average_rating': 4.8,
+                'total_bookings': 189,
+            },
+            {
+                'title': 'Langtang Valley Trek',
+                'slug': 'langtang-valley',
+                'description': 'A beautiful and less crowded trek through the Langtang National Park, home to red pandas, stunning glaciers and Tamang culture. Close to Kathmandu — perfect for shorter treks.',
+                'highlight': 'Kyanjin Gompa • Langtang Glacier • Red pandas • Tamang culture',
+                'category': valley,
+                'difficulty': 'moderate',
+                'duration_days': 7,
+                'max_altitude': 4984,
+                'distance_km': 65,
+                'max_group_size': 10,
+                'min_age': 12,
+                'start_point': 'Syabrubesi',
+                'end_point': 'Syabrubesi',
+                'region': 'Langtang',
+                'price_per_person': 600,
+                'discount_percent': 0,
+                'best_season': 'spring',
+                'tims_required': True,
+                'permit_info': 'Langtang National Park permit NPR 3000 + TIMS NPR 2000',
+                'gear_list': 'Warm layers, rain jacket, good trekking shoes',
+                'included': 'Meals, accommodation, guide, permits',
+                'excluded': 'Personal expenses, travel insurance',
+                'status': 'active',
+                'is_featured': False,
+                'average_rating': 4.7,
+                'total_bookings': 98,
+            },
+            {
+                'title': 'Gokyo Lakes Trek',
+                'slug': 'gokyo-lakes',
+                'description': 'Trek to the sacred Gokyo Lakes and climb Gokyo Ri for spectacular views of four 8000m peaks including Everest, Lhotse, Makalu and Cho Oyu.',
+                'highlight': 'Gokyo Ri summit • Sacred lakes • Ngozumpa Glacier • Four 8000ers view',
+                'category': high_alt,
+                'difficulty': 'difficult',
+                'duration_days': 13,
+                'max_altitude': 5357,
+                'distance_km': 110,
+                'max_group_size': 10,
+                'min_age': 16,
+                'start_point': 'Lukla',
+                'end_point': 'Lukla',
+                'region': 'Khumbu',
+                'price_per_person': 1100,
+                'discount_percent': 5,
+                'best_season': 'autumn',
+                'tims_required': True,
+                'permit_info': 'Sagarmatha NP permit NPR 3000 + TIMS NPR 2000',
+                'gear_list': 'Down jacket, -20C sleeping bag, crampons, trekking poles',
+                'included': 'All meals, accommodation, guide, porter, permits',
+                'excluded': 'Flights, insurance, personal gear',
+                'status': 'active',
+                'is_featured': True,
+                'average_rating': 4.8,
+                'total_bookings': 134,
+            },
+            {
+                'title': 'Mardi Himal Trek',
+                'slug': 'mardi-himal',
+                'description': 'A hidden gem in the Annapurna region. This off-the-beaten-path trek offers stunning views of Machhapuchhre (Fishtail) and Annapurna South with fewer crowds.',
+                'highlight': 'Machhapuchhre views • Less crowded • Rhododendron forests • High Camp',
+                'category': valley,
+                'difficulty': 'moderate',
+                'duration_days': 6,
+                'max_altitude': 4500,
+                'distance_km': 55,
+                'max_group_size': 12,
+                'min_age': 12,
+                'start_point': 'Kande',
+                'end_point': 'Lwang',
+                'region': 'Annapurna',
+                'price_per_person': 500,
+                'discount_percent': 0,
+                'best_season': 'spring',
+                'tims_required': True,
+                'permit_info': 'ACAP permit NPR 3000 + TIMS NPR 2000',
+                'gear_list': 'Warm layers, rain gear, good boots',
+                'included': 'Meals, accommodation, guide',
+                'excluded': 'Flights, personal expenses',
+                'status': 'active',
+                'is_featured': False,
+                'average_rating': 4.6,
+                'total_bookings': 67,
+            },
+            {
+                'title': 'Upper Mustang Trek',
+                'slug': 'upper-mustang',
+                'description': 'Trek into the forbidden kingdom of Lo — a restricted area that preserves ancient Tibetan culture, dramatic desert landscapes and cave monasteries carved into red cliffs.',
+                'highlight': 'Lo Manthang walled city • Cave monasteries • Tibetan culture • Desert landscape',
+                'category': cultural,
+                'difficulty': 'moderate',
+                'duration_days': 15,
+                'max_altitude': 3840,
+                'distance_km': 180,
+                'max_group_size': 8,
+                'min_age': 14,
+                'start_point': 'Jomsom',
+                'end_point': 'Jomsom',
+                'region': 'Mustang',
+                'price_per_person': 1800,
+                'discount_percent': 0,
+                'best_season': 'summer',
+                'tims_required': True,
+                'permit_info': 'Restricted Area permit $500/10 days + Annapurna permit NPR 3000',
+                'gear_list': 'Sun protection, warm layers, trekking poles',
+                'included': 'All meals, accommodation, guide, permits',
+                'excluded': 'International flights, insurance',
+                'status': 'active',
+                'is_featured': True,
+                'average_rating': 4.9,
+                'total_bookings': 45,
+            },
+        ]
+
+        for trek_data in treks_data:
+            trek, created = Trek.objects.get_or_create(
+                slug=trek_data['slug'],
+                defaults={**trek_data, 'created_by': admin}
+            )
+            if created:
+                self.stdout.write(f'  ✅ Trek: {trek.title}')
+
+                # Add itinerary for EBC
+                if trek.slug == 'everest-base-camp':
+                    itineraries = [
+                        {'day': 1, 'title': 'Fly to Lukla, Trek to Phakding', 'description': 'Scenic mountain flight to Lukla (2,860m) then trek through Sherpa villages to Phakding.', 'altitude_m': 2610, 'accommodation': 'Teahouse', 'meals': 'Lunch, Dinner'},
+                        {'day': 2, 'title': 'Phakding to Namche Bazaar', 'description': 'Trek through forests and cross suspension bridges to the Sherpa capital Namche Bazaar.', 'altitude_m': 3440, 'accommodation': 'Teahouse', 'meals': 'Breakfast, Lunch, Dinner'},
+                        {'day': 3, 'title': 'Acclimatization Day — Namche', 'description': 'Rest day for acclimatization. Optional hike to Everest View Hotel for panoramic views.', 'altitude_m': 3440, 'accommodation': 'Teahouse', 'meals': 'Breakfast, Lunch, Dinner'},
+                        {'day': 7, 'title': 'Trek to Everest Base Camp', 'description': 'The moment you have been waiting for — trek to Everest Base Camp at 5,364m with stunning Khumbu Icefall views.', 'altitude_m': 5364, 'accommodation': 'Teahouse', 'meals': 'Breakfast, Lunch, Dinner'},
+                        {'day': 8, 'title': 'Kala Patthar Sunrise, Descend', 'description': 'Early morning hike to Kala Patthar (5,545m) for the best Everest sunrise views, then descend.', 'altitude_m': 5545, 'accommodation': 'Teahouse', 'meals': 'Breakfast, Lunch, Dinner'},
+                    ]
+                    for itin in itineraries:
+                        TrekItinerary.objects.get_or_create(
+                            trek=trek, day=itin['day'],
+                            defaults=itin
+                        )
+
+                # Add availability
+                for i in range(3):
+                    start = date.today() + timedelta(days=30 * (i + 1))
+                    end = start + timedelta(days=trek_data['duration_days'])
+                    TrekAvailability.objects.get_or_create(
+                        trek=trek,
+                        start_date=start,
+                        defaults={
+                            'end_date': end,
+                            'available_slots': random.randint(6, 12),
+                            'booked_slots': random.randint(0, 3),
+                            'is_active': True,
+                        }
+                    )
+
+        # =====================
+        # TOUR CATEGORIES
+        # =====================
+        tour_cats = [
+            {'name': 'Cultural', 'slug': 'cultural-tour', 'icon': '🛕'},
+            {'name': 'Adventure', 'slug': 'adventure-tour', 'icon': '🧗'},
+            {'name': 'Wildlife', 'slug': 'wildlife-tour', 'icon': '🐘'},
+            {'name': 'Spiritual', 'slug': 'spiritual-tour', 'icon': '🙏'},
+        ]
+        for cat_data in tour_cats:
+            cat, created = TourCategory.objects.get_or_create(
+                slug=cat_data['slug'],
+                defaults={
+                    'name': cat_data['name'],
+                    'icon': cat_data['icon'],
+                    'description': f"{cat_data['name']} tours in Nepal",
+                }
+            )
+            if created:
+                self.stdout.write(f'  ✅ Tour category: {cat.name}')
+
+        cultural_tour = TourCategory.objects.get(slug='cultural-tour')
+        wildlife_tour = TourCategory.objects.get(slug='wildlife-tour')
+        spiritual_tour = TourCategory.objects.get(slug='spiritual-tour')
+        adventure_tour = TourCategory.objects.get(slug='adventure-tour')
+
+        # =====================
+        # TOURS
+        # =====================
+        tours_data = [
+            {
+                'title': 'Kathmandu Valley Heritage Tour',
+                'slug': 'kathmandu-valley-heritage',
+                'description': 'Explore the UNESCO World Heritage Sites of the Kathmandu Valley — Pashupatinath, Boudhanath, Swayambhunath and Patan Durbar Square in one unforgettable day.',
+                'highlights': 'Pashupatinath Temple • Boudhanath Stupa • Swayambhunath • Patan Museum',
+                'category': cultural_tour,
+                'tour_type': 'cultural',
+                'difficulty': 'easy',
+                'duration_days': 1,
+                'duration_hours': 8,
+                'max_group_size': 15,
+                'min_group_size': 2,
+                'min_age': 5,
+                'destination': 'Kathmandu Valley',
+                'pickup_point': 'Your hotel',
+                'dropoff_point': 'Your hotel',
+                'region': 'Bagmati',
+                'price_per_person': 65,
+                'discount_percent': 10,
+                'child_price': 35,
+                'best_season': 'all',
+                'entry_fee_included': True,
+                'guide_included': True,
+                'transport_included': True,
+                'meals_included': False,
+                'included': 'Transport, English guide, entry fees, bottled water',
+                'excluded': 'Meals, personal expenses, tips',
+                'status': 'active',
+                'is_featured': True,
+                'average_rating': 4.8,
+                'total_bookings': 312,
+            },
+            {
+                'title': 'Chitwan Jungle Safari',
+                'slug': 'chitwan-jungle-safari',
+                'description': 'Experience the wild side of Nepal in Chitwan National Park. Spot one-horned rhinos, Bengal tigers, gharial crocodiles and hundreds of bird species on jeep and elephant safaris.',
+                'highlights': 'Rhino spotting • Elephant safari • Bird watching • Tharu culture show',
+                'category': wildlife_tour,
+                'tour_type': 'wildlife',
+                'difficulty': 'easy',
+                'duration_days': 3,
+                'duration_hours': None,
+                'max_group_size': 12,
+                'min_group_size': 2,
+                'min_age': 8,
+                'destination': 'Chitwan National Park',
+                'pickup_point': 'Kathmandu or Pokhara',
+                'dropoff_point': 'Kathmandu or Pokhara',
+                'region': 'Terai',
+                'price_per_person': 280,
+                'discount_percent': 0,
+                'child_price': 180,
+                'best_season': 'winter',
+                'entry_fee_included': True,
+                'guide_included': True,
+                'transport_included': True,
+                'meals_included': True,
+                'included': 'All meals, accommodation, transport, guide, park fees, activities',
+                'excluded': 'Personal expenses, alcoholic drinks, tips',
+                'status': 'active',
+                'is_featured': True,
+                'average_rating': 4.9,
+                'total_bookings': 198,
+            },
+            {
+                'title': 'Pokhara Lakeside & Sarangkot Tour',
+                'slug': 'pokhara-sarangkot',
+                'description': 'Discover the beautiful city of Pokhara — sunrise over the Annapurnas from Sarangkot, peaceful Phewa Lake boat ride, Devi\'s Falls and the International Mountain Museum.',
+                'highlights': 'Sarangkot sunrise • Phewa Lake • Devi\'s Falls • Mountain Museum',
+                'category': cultural_tour,
+                'tour_type': 'scenic',
+                'difficulty': 'easy',
+                'duration_days': 2,
+                'duration_hours': None,
+                'max_group_size': 15,
+                'min_group_size': 1,
+                'min_age': 5,
+                'destination': 'Pokhara',
+                'pickup_point': 'Pokhara airport or hotel',
+                'dropoff_point': 'Pokhara hotel',
+                'region': 'Gandaki',
+                'price_per_person': 120,
+                'discount_percent': 15,
+                'child_price': 70,
+                'best_season': 'all',
+                'entry_fee_included': True,
+                'guide_included': True,
+                'transport_included': True,
+                'meals_included': True,
+                'included': 'Hotel, transport, guide, entry fees, boat ride, meals',
+                'excluded': 'Personal shopping, tips',
+                'status': 'active',
+                'is_featured': True,
+                'average_rating': 4.7,
+                'total_bookings': 267,
+            },
+            {
+                'title': 'Lumbini Pilgrimage Tour',
+                'slug': 'lumbini-pilgrimage',
+                'description': 'Visit the birthplace of Lord Buddha — Lumbini, a UNESCO World Heritage Site. Explore the sacred garden, Maya Devi Temple, Ashoka Pillar and monasteries from around the world.',
+                'highlights': 'Maya Devi Temple • Ashoka Pillar • Sacred Garden • World Peace Pagoda',
+                'category': spiritual_tour,
+                'tour_type': 'spiritual',
+                'difficulty': 'easy',
+                'duration_days': 2,
+                'duration_hours': None,
+                'max_group_size': 20,
+                'min_group_size': 1,
+                'min_age': 5,
+                'destination': 'Lumbini',
+                'pickup_point': 'Kathmandu',
+                'dropoff_point': 'Kathmandu',
+                'region': 'Lumbini Province',
+                'price_per_person': 150,
+                'discount_percent': 0,
+                'child_price': 80,
+                'best_season': 'winter',
+                'entry_fee_included': True,
+                'guide_included': True,
+                'transport_included': True,
+                'meals_included': True,
+                'included': 'Transport, accommodation, meals, guide, entry fees',
+                'excluded': 'Personal expenses, tips',
+                'status': 'active',
+                'is_featured': False,
+                'average_rating': 4.6,
+                'total_bookings': 143,
+            },
+            {
+                'title': 'Everest Scenic Flight',
+                'slug': 'everest-scenic-flight',
+                'description': 'See Mount Everest up close without trekking! A 1-hour mountain flight from Kathmandu gives you breathtaking views of Everest, Lhotse, Cho Oyu and the entire Himalayan range.',
+                'highlights': 'Everest close-up view • 10 Himalayan peaks • Window seat guaranteed • Certificate',
+                'category': adventure_tour,
+                'tour_type': 'scenic',
+                'difficulty': 'easy',
+                'duration_days': 1,
+                'duration_hours': 1,
+                'max_group_size': 18,
+                'min_group_size': 1,
+                'min_age': 3,
+                'destination': 'Himalayan Range',
+                'pickup_point': 'Kathmandu airport',
+                'dropoff_point': 'Kathmandu airport',
+                'region': 'Bagmati',
+                'price_per_person': 199,
+                'discount_percent': 0,
+                'child_price': 199,
+                'best_season': 'autumn',
+                'entry_fee_included': True,
+                'guide_included': True,
+                'transport_included': True,
+                'meals_included': False,
+                'included': 'Flight, window seat, certificate, airport transfers',
+                'excluded': 'Meals, travel insurance',
+                'status': 'active',
+                'is_featured': True,
+                'average_rating': 4.9,
+                'total_bookings': 421,
+            },
+            {
+                'title': 'Nagarkot Sunrise & Bhaktapur Tour',
+                'slug': 'nagarkot-bhaktapur',
+                'description': 'Watch the golden sunrise over the Himalayas from Nagarkot tower, then explore the medieval city of Bhaktapur — the best preserved Newari town with pottery squares and pagoda temples.',
+                'highlights': 'Himalayan sunrise • Bhaktapur Durbar Square • Pottery Square • Newari food',
+                'category': cultural_tour,
+                'tour_type': 'cultural',
+                'difficulty': 'easy',
+                'duration_days': 2,
+                'duration_hours': None,
+                'max_group_size': 15,
+                'min_group_size': 2,
+                'min_age': 5,
+                'destination': 'Nagarkot & Bhaktapur',
+                'pickup_point': 'Your hotel Kathmandu',
+                'dropoff_point': 'Your hotel Kathmandu',
+                'region': 'Bagmati',
+                'price_per_person': 95,
+                'discount_percent': 10,
+                'child_price': 55,
+                'best_season': 'all',
+                'entry_fee_included': True,
+                'guide_included': True,
+                'transport_included': True,
+                'meals_included': True,
+                'included': 'Hotel, transport, guide, entry fees, breakfast',
+                'excluded': 'Lunch, dinner, personal expenses',
+                'status': 'active',
+                'is_featured': False,
+                'average_rating': 4.7,
+                'total_bookings': 189,
+            },
+        ]
+
+        for tour_data in tours_data:
+            tour, created = Tour.objects.get_or_create(
+                slug=tour_data['slug'],
+                defaults={**tour_data, 'created_by': admin}
+            )
+            if created:
+                self.stdout.write(f'  ✅ Tour: {tour.title}')
+
+                # Add itinerary for Chitwan
+                if tour.slug == 'chitwan-jungle-safari':
+                    itineraries = [
+                        {'day': 1, 'title': 'Arrival & Orientation', 'description': 'Drive to Chitwan, check in to jungle resort, evening Tharu cultural show.', 'accommodation': 'Jungle Resort', 'meals': 'Lunch, Dinner', 'places_to_visit': 'Tharu Village'},
+                        {'day': 2, 'title': 'Full Day Safari', 'description': 'Morning elephant safari, afternoon jeep safari for rhino and tiger spotting, bird watching.', 'accommodation': 'Jungle Resort', 'meals': 'All meals', 'places_to_visit': 'Chitwan National Park'},
+                        {'day': 3, 'title': 'Canoe Ride & Departure', 'description': 'Early morning canoe ride on Rapti River for crocodile and bird spotting, then depart.', 'accommodation': '', 'meals': 'Breakfast', 'places_to_visit': 'Rapti River'},
+                    ]
+                    for itin in itineraries:
+                        TourItinerary.objects.get_or_create(
+                            tour=tour, day=itin['day'],
+                            defaults=itin
+                        )
+
+                # Add availability
+                for i in range(4):
+                    start = date.today() + timedelta(days=14 * (i + 1))
+                    end = start + timedelta(days=tour_data['duration_days'])
+                    TourAvailability.objects.get_or_create(
+                        tour=tour,
+                        start_date=start,
+                        defaults={
+                            'end_date': end,
+                            'available_slots': random.randint(8, 15),
+                            'booked_slots': random.randint(0, 4),
+                            'is_active': True,
+                        }
+                    )
+
+        self.stdout.write(self.style.SUCCESS('\n🎉 Seeding complete!'))
+        self.stdout.write('━' * 40)
+        self.stdout.write('📊 Summary:')
+        self.stdout.write(f'   Treks:  {Trek.objects.count()}')
+        self.stdout.write(f'   Tours:  {Tour.objects.count()}')
+        self.stdout.write(f'   Users:  {User.objects.count()}')
+        self.stdout.write('━' * 40)
+        self.stdout.write('🔑 Login credentials:')
+        self.stdout.write('   Admin  → admin / admin123')
+        self.stdout.write('   Guide  → guide_ram / guide123')
+        self.stdout.write('━' * 40)
+
