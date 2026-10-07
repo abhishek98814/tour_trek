@@ -1,28 +1,46 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGear } from '@/hooks/useGear';
 import { mediaUrl } from '../../lib/media';
 import Link from 'next/link';
 import {
-  Search, Backpack, MapPin, Star, Check, X, AlertTriangle, ArrowRight, Tent, Footprints,
-  Shirt, Hand, Flashlight, MountainSnow, SlidersHorizontal, Clock, Handshake,
+  Search, Backpack, MapPin, X, AlertTriangle, Tent, Footprints, Shirt, Hand,
+  Flashlight, MountainSnow, SlidersHorizontal, ChevronLeft, ChevronRight, ArrowUpRight,
+  Tag, CalendarDays, Camera, Truck,
 } from 'lucide-react';
 
-const CONDITIONS = ['all', 'new', 'like_new', 'good', 'fair', 'poor'];
-const LISTING_TYPES = ['all', 'sell', 'rent', 'both'];
-const SIZES = ['all', 'xs', 's', 'm', 'l', 'xl', 'xxl', 'one_size'];
 
-const conditionLabel: Record<string, string> = {
-  new: 'Brand new', like_new: 'Like new', good: 'Good shape', fair: 'Well used', poor: 'Rough but works',
-};
 
-const conditionColors: Record<string, string> = {
-  new: 'bg-[#dcfce7] text-[#15803d]', like_new: 'bg-[#dbeafe] text-[#1d4ed8]',
-  good: 'bg-[#fef9c3] text-[#a16207]', fair: 'bg-[#ffedd5] text-[#c2410c]', poor: 'bg-[#fee2e2] text-[#b91c1c]',
+const CONDITIONS = [
+  { value: 'all', label: 'Any condition' },
+  { value: 'new', label: 'Brand new' },
+  { value: 'like_new', label: 'Like new' },
+  { value: 'good', label: 'Good shape' },
+  { value: 'fair', label: 'Well used' },
+  { value: 'poor', label: 'Rough but works' },
+];
+const LISTING_TYPES = [
+  { value: 'all', label: 'Buy or rent' },
+  { value: 'sell', label: 'For sale' },
+  { value: 'rent', label: 'For rent' },
+  { value: 'both', label: 'Sale or rent' },
+];
+const SIZES = [
+  { value: 'all', label: 'Any' }, { value: 'xs', label: 'XS' }, { value: 's', label: 'S' },
+  { value: 'm', label: 'M' }, { value: 'l', label: 'L' }, { value: 'xl', label: 'XL' },
+  { value: 'xxl', label: 'XXL' }, { value: 'one_size', label: 'One size' },
+];
+
+const conditionLabel: Record<string, string> = Object.fromEntries(
+  CONDITIONS.filter((c) => c.value !== 'all').map((c) => [c.value, c.label])
+);
+// a small dot beside the condition, from "fresh" to "worn"
+const conditionDot: Record<string, string> = {
+  new: 'bg-[#2f7d57]', like_new: 'bg-[#5a9a5b]', good: 'bg-[#c9a227]', fair: 'bg-[#d27a2c]', poor: 'bg-[#b8322a]',
 };
 
 const categories = [
-  { label: 'All', slug: '', icon: null },
+  { label: 'All gear', slug: '', icon: null },
   { label: 'Tents', slug: 'tents', icon: Tent },
   { label: 'Boots', slug: 'boots', icon: Footprints },
   { label: 'Jackets', slug: 'jackets', icon: Shirt },
@@ -31,6 +49,8 @@ const categories = [
   { label: 'Lights', slug: 'lights', icon: Flashlight },
   { label: 'Climbing', slug: 'climbing', icon: MountainSnow },
 ];
+
+/* ---------- types & helpers ---------- */
 
 interface GearImage { image: string }
 interface GearItem {
@@ -45,8 +65,8 @@ interface GearItem {
 function timeAgo(dateStr?: string) {
   if (!dateStr) return null;
   const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
-  if (days <= 0) return 'Posted today';
-  if (days === 1) return 'Posted yesterday';
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
   if (days < 7) return `${days} days ago`;
   const weeks = Math.floor(days / 7);
   if (weeks < 5) return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
@@ -57,168 +77,374 @@ function timeAgo(dateStr?: string) {
 const initials = (name?: string) =>
   name ? name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase() : '';
 const firstName = (name?: string) => name?.split(' ')[0];
-const money = (v: number | string) => `NPR ${Number(v).toLocaleString()}`;
+const money = (v: number | string) => `Rs ${Number(v).toLocaleString('en-IN')}`;
 
 function priceOf(item: GearItem) {
-  if (item.sell_price) return { main: money(item.sell_price), sub: item.rent_price_per_day ? `or ${money(item.rent_price_per_day)} a day` : '' };
-  if (item.rent_price_per_day) return { main: money(item.rent_price_per_day), sub: 'per day' };
+  if (item.sell_price)
+    return { main: money(item.sell_price), sub: item.rent_price_per_day ? `or ${money(item.rent_price_per_day)} a day to rent` : '' };
+  if (item.rent_price_per_day) return { main: money(item.rent_price_per_day), sub: 'a day to rent' };
   return { main: 'Ask the seller', sub: '' };
 }
 
-function Avatar({ item, size = 'h-5 w-5' }: { item: GearItem; size?: string }) {
+/* ---------- small pieces ---------- */
+
+function Avatar({ item }: { item: GearItem }) {
   const src = mediaUrl(item.seller_avatar);
   return src ? (
-    <img src={src} alt="" className={`${size} rounded-full object-cover`} />
+    <img src={src} alt="" className="h-6 w-6 rounded-full object-cover" />
   ) : (
-    <span className={`${size} flex items-center justify-center rounded-full bg-[#e7ddd0] text-[9px] font-bold text-[#6b5a45]`}>
+    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#d9ded6] text-[10px] font-bold text-[#3c4a44]">
       {initials(item.seller_name)}
     </span>
   );
 }
 
-function Cover({ item, className = '' }: { item: GearItem; className?: string }) {
+function Cover({ item }: { item: GearItem }) {
   const cover = mediaUrl(item.cover_image || item.images?.[0]?.image);
   return cover ? (
-    <img src={cover} alt={item.title} loading="lazy" className={`h-full w-full object-cover ${className}`} />
+    <img src={cover} alt={item.title} loading="lazy"
+      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
   ) : (
-    <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br from-[#0f3d57] to-[#1f8f86] ${className}`}>
-      <Backpack className="h-10 w-10 text-white/70" strokeWidth={1.4} />
+    <div className="flex h-full w-full items-center justify-center bg-[#dfe4dc]">
+      <Backpack className="h-9 w-9 text-[#9aa79f]" strokeWidth={1.3} />
     </div>
   );
 }
 
-function HeroItems({ items, loading }: { items: GearItem[]; loading: boolean }) {
-  const tilt = ['md:-rotate-3 md:mt-10', 'md:rotate-1 md:-mt-2', 'md:rotate-3 md:mt-14'];
-  if (loading)
-    return (
-      <div className="grid grid-cols-3 gap-4">
-        {[0, 1, 2].map((i) => <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl bg-white/10" />)}
-      </div>
-    );
-  if (!items.length)
-    return (
-      <div className="rounded-2xl border border-dashed border-white/25 p-10 text-center text-white/70">
-        <Backpack className="mx-auto mb-3 h-10 w-10" strokeWidth={1.3} />
-        Nothing pinned up yet. Your gear could be the first.
-      </div>
-    );
-  return (
-    <div className="-mx-6 flex snap-x gap-4 overflow-x-auto px-6 pb-4 md:mx-0 md:grid md:grid-cols-3 md:gap-5 md:overflow-visible md:px-0 [scrollbar-width:none]">
-      {items.map((item, i) => {
-        const p = priceOf(item);
-        return (
-          <Link
-            key={item.id}
-            href={`/gear/${item.slug}`}
-            className={`group relative w-[210px] flex-shrink-0 snap-center rounded-2xl bg-[#fffaf2] p-2.5 pb-3.5 text-[#1c2a33] no-underline shadow-[0_24px_50px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:z-10 hover:-translate-y-2 hover:rotate-0 md:w-auto ${tilt[i % 3]}`}
-          >
-            <span className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full bg-[#dd8a3c] shadow-md ring-2 ring-[#fffaf2]" />
-            <div className="relative aspect-[4/5] overflow-hidden rounded-xl">
-              <Cover item={item} className="transition-transform duration-500 group-hover:scale-105" />
-              {item.is_featured && (
-                <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-[#dd8a3c] px-2 py-0.5 text-[11px] font-bold text-white">
-                  <Star className="h-3 w-3 fill-current" /> Staff pick
-                </span>
-              )}
-            </div>
-            <div className="px-1.5 pt-3">
-              <div className="line-clamp-1 text-[14px] font-bold">{item.title}</div>
-              <div className="mt-0.5 text-[15px] font-extrabold text-[#0f3d57]">{p.main}</div>
-              <div className="mt-2 flex items-center gap-1.5 text-[12px] text-[#6b5a45]">
-                <Avatar item={item} />
-                <span className="truncate">{firstName(item.seller_name) ?? 'A trekker'}{item.location ? ` in ${item.location}` : ''}</span>
-              </div>
-            </div>
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
-function GearCard({ item, index }: { item: GearItem; index: number }) {
-  const cond = conditionColors[item.condition ?? ''] ?? conditionColors.good;
-  const posted = timeAgo(item.created_at);
+function GearCard({ item }: { item: GearItem }) {
   const p = priceOf(item);
-  const forWhat = item.listing_type === 'both' ? 'Sale or rent' : item.listing_type === 'rent' ? 'For rent' : 'For sale';
+  const posted = timeAgo(item.created_at);
+  const tag = item.listing_type === 'both' ? 'Sale or rent' : item.listing_type === 'rent' ? 'For rent' : 'For sale';
+  const details = [
+    item.brand,
+    item.size && item.size !== 'na' ? `Size ${item.size.replace('_', ' ')}` : null,
+    Number(item.weight_kg) > 0 ? `${Number(item.weight_kg)} kg` : null,
+  ].filter(Boolean).join('  /  ');
 
   return (
-    <Link
-      href={`/gear/${item.slug}`}
-      className="gear-reveal group flex flex-col overflow-hidden rounded-2xl border border-[#eadfce] bg-white no-underline transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(23,36,47,0.12)]"
-      style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
-    >
-      <div className="relative h-[210px] overflow-hidden">
-        <Cover item={item} className="transition-transform duration-500 group-hover:scale-105" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#17242f]/70 via-transparent to-transparent" />
-        <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
-          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${cond}`}>
-            {conditionLabel[item.condition ?? ''] ?? item.condition?.replace('_', ' ')}
-          </span>
-          <span className="rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-[#0f3d57]">{forWhat}</span>
-        </div>
+    <Link href={`/gear/${item.slug}`} className="group block text-[#1c2622] no-underline">
+      <div className="relative aspect-[4/3] overflow-hidden bg-[#dfe4dc]">
+        <Cover item={item} />
+        <span className="absolute left-0 top-3 bg-[#1c2622] px-2.5 py-1 text-[12px] font-semibold text-white">{tag}</span>
         {item.is_featured && (
-          <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-[#dd8a3c] px-2.5 py-1 text-[11px] font-bold text-white">
-            <Star className="h-3 w-3 fill-current" /> Staff pick
-          </span>
-        )}
-        {item.location && (
-          <span className="absolute bottom-3 left-3 flex items-center gap-1 text-xs font-medium text-white">
-            <MapPin className="h-3.5 w-3.5" /> {item.location}
+          <span className="absolute bottom-0 right-0 bg-[#b8322a] px-2.5 py-1 text-[12px] font-semibold text-white">
+            Our pick
           </span>
         )}
       </div>
 
-      <div className="flex flex-1 flex-col p-4">
-        <div className="mb-1 flex items-center justify-between gap-2 text-[12px]">
-          <span className="font-semibold text-[#1f8f86]">{item.brand}</span>
-          {posted && (
-            <span className="flex items-center gap-1 text-[#9a8d7c]"><Clock className="h-3 w-3" /> {posted}</span>
+      <div className="pt-3.5">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="line-clamp-2 text-[17px] font-semibold leading-snug group-hover:underline group-hover:decoration-[#b8322a] group-hover:underline-offset-4">
+            {item.title}
+          </h3>
+          <div className="whitespace-nowrap text-right text-[17px] font-bold tabular-nums">{p.main}</div>
+        </div>
+
+        <div className="mt-1 flex items-start justify-between gap-3 text-[13px] text-[#5f6b66]">
+          <span className="truncate">{details}</span>
+          {item.is_negotiable && item.sell_price ? <span className="whitespace-nowrap text-[#2f7d57]">Open to offers</span> : null}
+        </div>
+        {p.sub && <div className="mt-0.5 text-right text-[12.5px] text-[#5f6b66]">{p.sub}</div>}
+
+        <div className="mt-3 flex items-center gap-2 border-t border-[#d5d9d2] pt-3 text-[13px] text-[#5f6b66]">
+          {item.condition && (
+            <span className="flex items-center gap-1.5 font-medium text-[#1c2622]">
+              <span className={`h-2 w-2 rounded-full ${conditionDot[item.condition] ?? 'bg-[#999]'}`} />
+              {conditionLabel[item.condition] ?? item.condition}
+            </span>
+          )}
+          {item.location && (
+            <span className="flex items-center gap-1 truncate"><MapPin className="h-3.5 w-3.5" />{item.location}</span>
           )}
         </div>
-        <h3 className="mb-2 line-clamp-1 text-[16px] font-bold text-[#17242f]">{item.title}</h3>
 
-        <div className="mb-3 flex flex-wrap gap-2 text-[12px] text-[#5b6b76]">
-          {item.size && item.size !== 'na' && <span className="rounded-md bg-[#f5efe6] px-2 py-1">Size {item.size.replace('_', ' ')}</span>}
-          {Number(item.weight_kg) > 0 && <span className="rounded-md bg-[#f5efe6] px-2 py-1">{Number(item.weight_kg)} kg</span>}
-        </div>
-
-        <div className="mt-auto flex items-end justify-between gap-3 border-t border-[#f1e9dc] pt-3">
-          <div className="min-w-0">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-lg font-extrabold text-[#17242f]">{p.main}</span>
-              {item.sell_price && item.is_negotiable && (
-                <span className="flex items-center gap-0.5 text-[11px] font-semibold text-[#15803d]"><Handshake className="h-3 w-3" /> Open to offers</span>
-              )}
-            </div>
-            {p.sub && <div className="text-xs text-[#6b7b86]">{p.sub}</div>}
-            {item.seller_name && (
-              <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[#6b7b86]">
-                <Avatar item={item} /> <span className="truncate">Listed by {firstName(item.seller_name)}</span>
-              </div>
-            )}
+        {item.seller_name && (
+          <div className="mt-2.5 flex items-center gap-2 text-[13px] text-[#5f6b66]">
+            <Avatar item={item} />
+            <span className="truncate">
+              {firstName(item.seller_name)}{posted ? `, listed ${posted}` : ''}
+            </span>
           </div>
-          <span className="flex flex-shrink-0 items-center gap-1 rounded-full bg-[#0f3d57] px-4 py-2 text-xs font-bold text-white transition-colors group-hover:bg-[#b96a24]">
-            Take a look <ArrowRight className="h-3 w-3" />
-          </span>
-        </div>
+        )}
       </div>
     </Link>
   );
 }
 
-function GearCardSkeleton() {
+function CardSkeleton() {
   return (
-    <div className="animate-pulse overflow-hidden rounded-2xl border border-[#eadfce] bg-white">
-      <div className="h-[210px] bg-[#f1e9dc]" />
-      <div className="space-y-2.5 p-4">
-        <div className="h-3 w-1/3 rounded bg-[#f1e9dc]" />
-        <div className="h-4 w-3/4 rounded bg-[#f1e9dc]" />
-        <div className="h-8 rounded bg-[#f1e9dc]" />
-      </div>
+    <div className="animate-pulse">
+      <div className="aspect-[4/3] bg-[#dfe4dc]" />
+      <div className="mt-3.5 h-4 w-3/4 bg-[#dfe4dc]" />
+      <div className="mt-2 h-3 w-1/2 bg-[#e6eae3]" />
+      <div className="mt-6 h-3 w-2/3 bg-[#e6eae3]" />
     </div>
   );
 }
+
+function FilterGroup({
+  title, options, value, onChange,
+}: { title: string; options: { value: string; label: string }[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <fieldset className="border-0 p-0">
+      <legend className="mb-2.5 text-[14px] font-bold text-[#1c2622]">{title}</legend>
+      <div className="flex flex-col">
+        {options.map((o) => {
+          const active = value === o.value;
+          return (
+            <button
+              key={o.value}
+              onClick={() => onChange(o.value)}
+              aria-pressed={active}
+              className={`flex items-center gap-2.5 border-l-2 py-1.5 pl-3 text-left text-[14px] transition-colors ${
+                active ? 'border-[#b8322a] font-semibold text-[#1c2622]' : 'border-transparent text-[#5f6b66] hover:text-[#1c2622]'
+              }`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+
+/* ---------- hero (banner area) ---------- */
+
+/*
+  BANNERS: drop your images in /public/banners and set `image` (e.g. '/banners/season.jpg').
+  Best size: 1600 x 800 px, subject on the RIGHT side (text sits on the left).
+  Leave `image` empty and a coloured fallback with a mountain ridge is shown.
+*/
+type HeroAction = { category?: string; listing?: string };
+interface Banner { id: string; title: string; text: string; cta: string; action: HeroAction; image: string; tone: string }
+
+const BANNERS: Banner[] = [
+  {
+    id: 'season',
+    title: 'Trek season is here. Gear up second-hand.',
+    text: 'Down jackets, boots and sleeping bags that have already done the hard miles, at a fraction of the price.',
+    cta: 'Shop jackets',
+    action: { category: 'Jackets' },
+    image: '', // '/banners/season.jpg'
+    tone: '#17384a',
+  },
+  {
+    id: 'rent',
+    title: 'Rent it for the trek. Hand it back after.',
+    text: 'Need a 4-season tent for ten days, not ten years? Rent by the day from trekkers near you.',
+    cta: 'Browse rentals',
+    action: { listing: 'rent' },
+    image: '', // '/banners/rent.jpg'
+    tone: '#7a2a24',
+  },
+  {
+    id: 'tents',
+    title: 'Tents that have seen real weather.',
+    text: 'Check the photos, ask the seller anything, and make an offer if the price allows it.',
+    cta: 'See tents',
+    action: { category: 'Tents' },
+    image: '', // '/banners/tents.jpg'
+    tone: '#2f4a3a',
+  },
+];
+
+const PROMOS = [
+  {
+    id: 'rent', title: 'Rent by the day', text: 'Pay only for the days you trek.', cta: 'See rentals',
+    action: { listing: 'rent' } as HeroAction, href: '', image: '', tone: '#24566e',
+  },
+  {
+    id: 'sell', title: 'Sell your old gear', text: 'List it in a few minutes.', cta: 'Start a listing',
+    action: {} as HeroAction, href: '/gear/create', image: '', tone: '#b8322a',
+  },
+];
+
+const PERKS = [
+  { icon: Tag, title: 'Open to offers', text: 'Many sellers negotiate' },
+  { icon: CalendarDays, title: 'Buy or rent', text: 'Own it or borrow it' },
+  { icon: Camera, title: 'Real photos', text: 'Shot by the seller' },
+  { icon: Truck, title: 'Across Nepal', text: 'Kathmandu to Pokhara and beyond' },
+];
+
+function Ridge({ tone }: { tone: string }) {
+  return (
+    <svg viewBox="0 0 800 400" preserveAspectRatio="xMidYMax slice" className="absolute inset-0 h-full w-full" aria-hidden="true">
+      <circle cx="610" cy="120" r="46" fill="#fff" opacity="0.14" />
+      <path d="M0 400V270l90-60 70 40 120-120 90 90 80-70 110 110 70-50 170 90v100z" fill="#000" opacity="0.22" />
+      <path d="M0 400V320l130-80 90 60 140-110 120 100 90-60 230 110v60z" fill="#000" opacity="0.32" />
+      <path d="M360 190l22 18-14-2-8 12-10-14-14 4z" fill="#fff" opacity="0.5" />
+    </svg>
+  );
+}
+
+function Hero({
+  search, setSearch, onAction,
+}: { search: string; setSearch: (v: string) => void; onAction: (a: HeroAction) => void }) {
+  const [idx, setIdx] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [reduced, setReduced] = useState(false);
+
+  useEffect(() => {
+    setReduced(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }, []);
+
+  useEffect(() => {
+    if (paused || reduced) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % BANNERS.length), 6500);
+    return () => clearInterval(t);
+  }, [paused, reduced]);
+
+  const go = (n: number) => setIdx((n + BANNERS.length) % BANNERS.length);
+
+  return (
+    <section className="border-b border-[#d5d9d2] bg-[#e4e8e1]">
+      <div className="mx-auto max-w-[1200px] px-6 pb-8 pt-7">
+        {/* search row */}
+        <form
+          role="search"
+          onSubmit={(e) => { e.preventDefault(); onAction({}); }}
+          className="mb-5 flex items-stretch border-2 border-[#1c2622] bg-white focus-within:border-[#b8322a]"
+        >
+          <label htmlFor="gear-search" className="sr-only">Search gear</label>
+          <Search className="my-auto ml-4 h-5 w-5 flex-shrink-0 text-[#5f6b66]" />
+          <input
+            id="gear-search"
+            type="text"
+            placeholder="Search down jackets, 4-season tents, size 42 boots…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-transparent px-3 py-3.5 text-[16px] outline-none placeholder:text-[#8b968f]"
+          />
+          {search && (
+            <button type="button" onClick={() => setSearch('')} aria-label="Clear search" className="px-3 text-[#5f6b66] hover:text-[#1c2622]">
+              <X className="h-4 w-4" />
+            </button>
+          )}
+          <button type="submit" className="bg-[#1c2622] px-7 text-[15px] font-semibold text-white transition-colors hover:bg-[#b8322a]">
+            Search
+          </button>
+        </form>
+
+        <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          {/* banner carousel */}
+          <div
+            className="relative h-[360px] overflow-hidden md:h-[420px]"
+            role="region"
+            aria-roledescription="carousel"
+            aria-label="Featured offers"
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+            onFocus={() => setPaused(true)}
+            onBlur={() => setPaused(false)}
+          >
+            {BANNERS.map((b, i) => (
+              <div
+                key={b.id}
+                aria-hidden={i !== idx}
+                className={`absolute inset-0 transition-opacity duration-700 ${i === idx ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+                style={{ background: b.tone }}
+              >
+                {b.image ? (
+                  <>
+                    <img src={b.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/35 to-transparent" />
+                  </>
+                ) : (
+                  <Ridge tone={b.tone} />
+                )}
+                <div className="relative flex h-full max-w-[560px] flex-col justify-center px-8 pb-10 md:px-12">
+                  <h2 className="gear-display text-[clamp(30px,4.6vw,50px)] font-extrabold leading-[1.04] tracking-tight text-white">
+                    {b.title}
+                  </h2>
+                  <p className="mt-4 max-w-[44ch] text-[16px] leading-relaxed text-white/85">{b.text}</p>
+                  <button
+                    onClick={() => onAction(b.action)}
+                    tabIndex={i === idx ? 0 : -1}
+                    className="mt-7 inline-flex w-fit items-center gap-2 bg-white px-6 py-3 text-[15px] font-bold text-[#1c2622] transition-colors hover:bg-[#f2c9c5]"
+                  >
+                    {b.cta} <ArrowUpRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {/* controls */}
+            <div className="absolute bottom-4 left-8 flex items-center gap-2 md:left-12">
+              {BANNERS.map((b, i) => (
+                <button
+                  key={b.id}
+                  onClick={() => setIdx(i)}
+                  aria-label={`Show banner ${i + 1}`}
+                  aria-current={i === idx}
+                  className={`h-1.5 transition-all ${i === idx ? 'w-9 bg-white' : 'w-4 bg-white/45 hover:bg-white/70'}`}
+                />
+              ))}
+            </div>
+            <div className="absolute bottom-3 right-3 flex gap-1.5">
+              <button onClick={() => go(idx - 1)} aria-label="Previous banner" className="flex h-9 w-9 items-center justify-center bg-white/90 text-[#1c2622] hover:bg-white">
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button onClick={() => go(idx + 1)} aria-label="Next banner" className="flex h-9 w-9 items-center justify-center bg-white/90 text-[#1c2622] hover:bg-white">
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* side promos */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+            {PROMOS.map((p) => {
+              const inner = (
+                <>
+                  {p.image ? (
+                    <>
+                      <img src={p.image} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                    </>
+                  ) : (
+                    <Ridge tone={p.tone} />
+                  )}
+                  <div className="relative flex h-full flex-col justify-end p-6 text-white">
+                    <div className="gear-display text-[24px] font-bold leading-tight">{p.title}</div>
+                    <div className="mt-1 text-[14px] text-white/85">{p.text}</div>
+                    <div className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-semibold underline underline-offset-4">
+                      {p.cta} <ArrowUpRight className="h-4 w-4" />
+                    </div>
+                  </div>
+                </>
+              );
+              const cls = 'group relative block h-[190px] overflow-hidden text-left no-underline md:h-[202px]';
+              return p.href ? (
+                <Link key={p.id} href={p.href} className={cls} style={{ background: p.tone }}>{inner}</Link>
+              ) : (
+                <button key={p.id} onClick={() => onAction(p.action)} className={cls} style={{ background: p.tone }}>{inner}</button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* perks strip */}
+        <ul className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4">
+          {PERKS.map(({ icon: Icon, title, text }) => (
+            <li key={title} className="flex items-center gap-3">
+              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center bg-white text-[#b8322a]">
+                <Icon className="h-5 w-5" strokeWidth={1.8} />
+              </span>
+              <span className="leading-tight">
+                <span className="block text-[14.5px] font-bold">{title}</span>
+                <span className="text-[13px] text-[#5f6b66]">{text}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- page ---------- */
 
 export default function GearPage() {
   const [listingType, setListingType] = useState('all');
@@ -227,7 +453,7 @@ export default function GearPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [negotiable, setNegotiable] = useState(false);
-  const [category, setCategory] = useState('All');
+  const [category, setCategory] = useState('All gear');
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
@@ -249,134 +475,53 @@ export default function GearPage() {
   const items: GearItem[] = data?.results || data || [];
   const total: number = data?.count ?? items.length;
 
-  const heroItems = useMemo(() => {
-    const withPhoto = items.filter((i) => i.cover_image || i.images?.length);
-    const picks = withPhoto.filter((i) => i.is_featured);
-    const rest = withPhoto.filter((i) => !i.is_featured);
-    return [...picks, ...rest].slice(0, 3);
-  }, [items]);
-
   const activeFilterCount = [
-    listingType !== 'all', condition !== 'all', size !== 'all', !!search, negotiable, category !== 'All',
+    listingType !== 'all', condition !== 'all', size !== 'all', !!search, negotiable, category !== 'All gear',
   ].filter(Boolean).length;
   const hasActiveFilters = activeFilterCount > 0;
 
   const resetFilters = () => {
     setListingType('all'); setCondition('all'); setSize('all');
-    setSearch(''); setNegotiable(false); setCategory('All');
+    setSearch(''); setNegotiable(false); setCategory('All gear');
   };
 
-  const selectClass =
-    'cursor-pointer rounded-lg border border-[#e3d8c8] bg-white px-3 py-2.5 text-[13px] font-medium text-[#374151] outline-none transition-colors focus:border-[#dd8a3c] focus-visible:ring-2 focus-visible:ring-[#dd8a3c]/40';
+  const applyAction = (a: HeroAction) => {
+    if (a.category) setCategory(a.category);
+    if (a.listing) setListingType(a.listing);
+    setTimeout(() => document.getElementById('results')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  };
+
+  const filters = (
+    <div className="flex flex-col gap-8">
+      <FilterGroup title="Buy or rent" options={LISTING_TYPES} value={listingType} onChange={setListingType} />
+      <FilterGroup title="Condition" options={CONDITIONS} value={condition} onChange={setCondition} />
+      <FilterGroup title="Size" options={SIZES} value={size} onChange={setSize} />
+      <label className="flex cursor-pointer items-center gap-2.5 text-[14px] text-[#1c2622]">
+        <input
+          type="checkbox"
+          checked={negotiable}
+          onChange={(e) => setNegotiable(e.target.checked)}
+          className="h-4 w-4 accent-[#b8322a]"
+        />
+        Sellers open to offers only
+      </label>
+      {hasActiveFilters && (
+        <button onClick={resetFilters} className="flex items-center gap-1.5 self-start text-[14px] font-semibold text-[#b8322a] underline underline-offset-4">
+          <X className="h-3.5 w-3.5" /> Clear everything
+        </button>
+      )}
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[#faf6ef]">
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#0f3d57] via-[#0a2e45] to-[#061e30] px-6 pb-16 pt-14">
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              'radial-gradient(ellipse at 10% 15%, rgba(221,138,60,0.16) 0%, transparent 45%), radial-gradient(ellipse at 95% 85%, rgba(31,143,134,0.2) 0%, transparent 45%)',
-          }}
-        />
-        <div className="relative mx-auto grid max-w-[1200px] items-center gap-10 md:grid-cols-[1fr_1.15fr]">
-          <div>
-            <h1 className="mb-4 max-w-[520px] text-[clamp(30px,5vw,50px)] font-extrabold leading-[1.1] tracking-tight text-white">
-              Someone&apos;s last trek is your next one&apos;s gear
-            </h1>
-            <p className="m-0 max-w-[440px] text-[16px] leading-relaxed text-white/70">
-              Boots that already know the trail to Thorong La. Jackets that kept someone warm at Base Camp. Buy
-              them, rent them for the season, or pass on your own.
-            </p>
+    <div className="min-h-screen bg-[#eef0ec] text-[#1c2622]" style={{ fontFamily: "'Hanken Grotesk', system-ui, sans-serif" }}>
+      {/* hero */}
+      <Hero search={search} setSearch={setSearch} onAction={applyAction} />
 
-            <div className="mt-7 flex max-w-[500px] items-center gap-2 rounded-2xl bg-white p-2 shadow-[0_20px_50px_rgba(6,30,48,0.35)] focus-within:ring-2 focus-within:ring-[#dd8a3c]">
-              <Search className="ml-2 h-[18px] w-[18px] flex-shrink-0 text-[#9a8d7c]" />
-              <input
-                type="text"
-                placeholder="What do you need for the trail? Tent, boots, jacket…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full border-none bg-transparent py-2 text-[14px] text-[#17242f] outline-none placeholder:text-[#9a8d7c]"
-              />
-              {search && (
-                <button onClick={() => setSearch('')} aria-label="Clear search"
-                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[#9a8d7c] hover:bg-[#f5efe6]">
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-
-            <p className="mt-4 text-[14px] text-white/55">
-              {isLoading ? 'Finding gear for you…' : total === 0 ? 'No listings match yet.' : `${total} item${total !== 1 ? 's' : ''} waiting for a new trail`}
-            </p>
-          </div>
-
-          <HeroItems items={heroItems} loading={isLoading} />
-        </div>
-      </div>
-
-      <div className="sticky top-[72px] z-[100] border-b border-[#eadfce] bg-[#faf6ef]/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[1200px] items-center gap-2.5 overflow-x-auto px-6 py-3.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <button
-            onClick={() => setShowFilters((v) => !v)}
-            className={`flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3.5 py-2.5 text-[13px] font-semibold transition-colors md:hidden ${
-              showFilters ? 'border-[#0f3d57] bg-[#0f3d57] text-white' : 'border-[#e3d8c8] bg-white text-[#64748b]'
-            }`}
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" /> Filters
-            {activeFilterCount > 0 && (
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#dd8a3c] text-[10px] font-bold text-white">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
-
-          <div className={`${showFilters ? 'flex' : 'hidden'} flex-shrink-0 flex-wrap items-center gap-2.5 md:flex`}>
-            <select aria-label="Listing type" value={listingType} onChange={(e) => setListingType(e.target.value)} className={selectClass}>
-              {LISTING_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t === 'all' ? 'Buy or rent' : t === 'both' ? 'Sale or rent' : t === 'sell' ? 'For sale' : 'For rent'}
-                </option>
-              ))}
-            </select>
-            <select aria-label="Condition" value={condition} onChange={(e) => setCondition(e.target.value)} className={selectClass}>
-              {CONDITIONS.map((c) => (
-                <option key={c} value={c}>{c === 'all' ? 'Any condition' : conditionLabel[c]}</option>
-              ))}
-            </select>
-            <select aria-label="Size" value={size} onChange={(e) => setSize(e.target.value)} className={selectClass}>
-              {SIZES.map((s) => (
-                <option key={s} value={s}>{s === 'all' ? 'Any size' : s === 'one_size' ? 'One size' : s.toUpperCase()}</option>
-              ))}
-            </select>
-            <button
-              onClick={() => setNegotiable(!negotiable)}
-              aria-pressed={negotiable}
-              className={`flex items-center gap-1.5 rounded-lg border px-4 py-2.5 text-[13px] font-semibold transition-colors ${
-                negotiable ? 'border-[#15803d] bg-[#f0fdf4] text-[#15803d]' : 'border-[#e3d8c8] bg-white text-[#64748b] hover:border-[#dd8a3c]/50'
-              }`}
-            >
-              {negotiable && <Check className="h-3.5 w-3.5" />} Open to offers
-            </button>
-            {hasActiveFilters && (
-              <button onClick={resetFilters}
-                className="flex items-center gap-1 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3.5 py-2.5 text-xs font-semibold text-[#b91c1c] hover:bg-[#fee2e2]">
-                <X className="h-3.5 w-3.5" /> Clear all
-              </button>
-            )}
-          </div>
-
-          {!isLoading && (
-            <span className="ml-auto flex-shrink-0 whitespace-nowrap text-[13px] text-[#8a7d6b]">
-              {total} item{total !== 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="mx-auto max-w-[1200px] px-6 py-10 pb-20">
-        {!isError && (
-          <div className="mb-7 flex flex-wrap gap-2">
+      <header className="border-b border-[#d5d9d2] bg-[#eef0ec] pt-4">
+        {/* category tabs */}
+        <nav aria-label="Gear categories" className="mx-auto max-w-[1200px] overflow-x-auto px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex gap-7">
             {categories.map((cat) => {
               const active = category === cat.label;
               return (
@@ -384,93 +529,116 @@ export default function GearPage() {
                   key={cat.label}
                   onClick={() => setCategory(cat.label)}
                   aria-pressed={active}
-                  className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold transition-colors ${
-                    active ? 'bg-[#0f3d57] text-white' : 'border border-[#e3d8c8] bg-white text-[#5b6b76] hover:border-[#dd8a3c]/60 hover:text-[#17242f]'
+                  className={`-mb-px flex flex-shrink-0 items-center gap-2 border-b-[3px] pb-3 pt-1 text-[15px] transition-colors ${
+                    active ? 'border-[#b8322a] font-bold' : 'border-transparent text-[#5f6b66] hover:text-[#1c2622]'
                   }`}
                 >
-                  {cat.icon && <cat.icon className="h-3.5 w-3.5" />} {cat.label}
+                  {cat.icon && <cat.icon className="h-4 w-4" strokeWidth={1.8} />}
+                  {cat.label}
                 </button>
               );
             })}
           </div>
-        )}
+        </nav>
+      </header>
 
-        {isLoading && (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-6">
-            {Array.from({ length: 6 }).map((_, i) => <GearCardSkeleton key={i} />)}
-          </div>
-        )}
+      {/* body */}
+      <main id="results" className="mx-auto grid scroll-mt-4 max-w-[1200px] gap-10 px-6 py-10 pb-24 lg:grid-cols-[220px_1fr]">
+        {/* filters */}
+        <aside className="lg:sticky lg:top-24 lg:self-start">
+          <button
+            onClick={() => setShowFilters((v) => !v)}
+            aria-expanded={showFilters}
+            className="mb-5 flex items-center gap-2 border border-[#1c2622] px-4 py-2.5 text-[14px] font-semibold lg:hidden"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+          </button>
+          <div className={`${showFilters ? 'block' : 'hidden'} lg:block`}>{filters}</div>
+        </aside>
 
-        {isError && (
-          <div className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] py-14 text-center">
-            <AlertTriangle className="mx-auto mb-3 h-9 w-9 text-[#b91c1c]" />
-            <p className="mb-1 font-semibold text-[#b91c1c]">We couldn&apos;t load the listings</p>
-            <p className="text-[13px] text-[#64748b]">Check your connection and reload the page. If it keeps happening, the server may be down.</p>
-          </div>
-        )}
+        {/* results */}
+        <section aria-live="polite">
+          {!isError && (
+            <div className="mb-6 flex items-baseline justify-between gap-4">
+              <h2 className="text-[18px] font-bold">
+                {isLoading
+                  ? 'Looking through the listings…'
+                  : total === 0
+                  ? 'No matches'
+                  : `${total} ${total === 1 ? 'listing' : 'listings'}${category !== 'All gear' ? ` in ${category.toLowerCase()}` : ''}`}
+              </h2>
+              {debouncedSearch && !isLoading && (
+                <span className="truncate text-[14px] text-[#5f6b66]">for &ldquo;{debouncedSearch}&rdquo;</span>
+              )}
+            </div>
+          )}
 
-        {!isLoading && !isError && items.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-[#d6c8b2] bg-white py-20 text-center">
-            <Backpack className="mx-auto mb-4 h-12 w-12 text-[#d6c8b2]" strokeWidth={1.3} />
-            <h3 className="mb-2 text-xl font-bold text-[#17242f]">Nothing here yet</h3>
-            <p className="mx-auto mb-6 max-w-[360px] text-[#64748b]">
-              {hasActiveFilters
-                ? 'No gear matches those filters. Try removing one or two.'
-                : 'No one has listed gear here. Yours could be the first.'}
-            </p>
-            {hasActiveFilters ? (
-              <button onClick={resetFilters}
-                className="rounded-lg border border-[#e3d8c8] bg-white px-6 py-2.5 text-sm font-semibold text-[#374151] hover:border-[#dd8a3c]/60">
-                Clear filters
-              </button>
-            ) : (
-              <Link href="/gear/create"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0f3d57] px-6 py-2.5 text-sm font-semibold text-white no-underline hover:opacity-90">
-                {/* List your gear <ArrowRight className="h-4 w-4" /> */}
+          {isLoading && (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-x-7 gap-y-12">
+              {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
+            </div>
+          )}
+
+          {isError && (
+            <div className="border-l-4 border-[#b8322a] bg-white px-6 py-8">
+              <AlertTriangle className="mb-3 h-7 w-7 text-[#b8322a]" />
+              <p className="mb-1 text-[17px] font-bold">We couldn&apos;t load the listings</p>
+              <p className="text-[15px] text-[#4a5751]">
+                Check your connection and reload the page. If it keeps happening, the server may be down.
+              </p>
+            </div>
+          )}
+
+          {!isLoading && !isError && items.length === 0 && (
+            <div className="border border-dashed border-[#b6beb5] px-6 py-16 text-center">
+              <Backpack className="mx-auto mb-4 h-10 w-10 text-[#9aa79f]" strokeWidth={1.3} />
+              <h3 className="gear-display mb-2 text-[24px] font-bold">
+                {hasActiveFilters ? 'Nothing fits those filters' : 'No one has listed gear yet'}
+              </h3>
+              <p className="mx-auto mb-6 max-w-[38ch] text-[15px] text-[#4a5751]">
+                {hasActiveFilters
+                  ? 'Try loosening one or two of them, or search for something broader.'
+                  : 'Got a jacket or a pair of boots you no longer use? Yours could be the first listing.'}
+              </p>
+              {hasActiveFilters ? (
+                <button onClick={resetFilters} className="bg-[#1c2622] px-6 py-3 text-[15px] font-semibold text-white hover:bg-[#b8322a]">
+                  Clear filters
+                </button>
+              ) : (
+                <Link href="/gear/create" className="inline-block bg-[#1c2622] px-6 py-3 text-[15px] font-semibold text-white no-underline hover:bg-[#b8322a]">
+                  List your gear
+                </Link>
+              )}
+            </div>
+          )}
+
+          {!isLoading && !isError && items.length > 0 && (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-x-7 gap-y-12">
+              {items.map((item) => <GearCard key={item.id} item={item} />)}
+            </div>
+          )}
+
+          {/* sell prompt */}
+          {!isError && !isLoading && items.length > 0 && (
+            <div className="mt-20 flex flex-wrap items-center justify-between gap-6 border-t-2 border-[#1c2622] pt-8">
+              <div className="max-w-[52ch]">
+                <h3 className="gear-display text-[26px] font-bold leading-tight">Got gear gathering dust?</h3>
+                <p className="mt-2 text-[15px] leading-relaxed text-[#4a5751]">
+                  Listing takes a few minutes. Add some photos, set a price, and another trekker will find it.
+                </p>
+              </div>
+              <Link href="/gear/create" className="bg-[#b8322a] px-7 py-3.5 text-[15px] font-semibold text-white no-underline transition-colors hover:bg-[#1c2622]">
+                List your gear
               </Link>
-            )}
-          </div>
-        )}
-
-        {!isLoading && !isError && items.length > 0 && (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-6">
-            {items.map((item, i) => <GearCard key={item.id} item={item} index={i} />)}
-          </div>
-        )}
-
-        <div className="mt-14 flex flex-wrap items-center justify-between gap-5 rounded-2xl bg-[#0f3d57] px-7 py-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white/10">
-              <Backpack className="h-5 w-5 text-[#f0aa5f]" />
             </div>
-            <div>
-              <div className="text-[17px] font-bold text-white">Gear gathering dust in a closet?</div>
-              <div className="text-[14px] text-white/70">Listing takes a few minutes, and another trekker is probably searching for it right now.</div>
-            </div>
-          </div>
-      
-
-          {/* <Link href="/gear/create"
-            className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#dd8a3c] px-6 py-3 text-sm font-bold text-white no-underline transition-colors hover:bg-[#c97a2e]">
-            List your gear <ArrowRight className="h-4 w-4" />
-          </Link> */}
-
-          <Link href="/gear/create"
-            className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#dd8a3c] px-6 py-3 text-sm font-bold text-white no-underline transition-colors hover:bg-[#c97a2e]">
-            List your gear <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </div>
+          )}
+        </section>
+      </main>
 
       <style jsx global>{`
-        .gear-reveal { opacity: 0; animation: gearIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-        @keyframes gearIn {
-          from { opacity: 0; transform: translateY(14px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .gear-reveal { animation: none; opacity: 1; }
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
+        .gear-display { font-family: 'Bricolage Grotesque', 'Hanken Grotesk', system-ui, sans-serif; }
       `}</style>
     </div>
   );
