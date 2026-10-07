@@ -115,7 +115,7 @@ function BookingRow({ booking }: { booking: Booking }) {
             <Pill value={booking.payment_status} />
           </div>
         </div>
-        <Link href="/booking" className="rounded border border-[#d5dbe0] px-3.5 py-2 text-sm font-semibold text-[#17242f] no-underline transition-colors hover:border-[#1f8f86] hover:text-[#1f8f86]">
+        <Link href="/dashboard/my-bookings" className="rounded border border-[#d5dbe0] px-3.5 py-2 text-sm font-semibold text-[#17242f] no-underline transition-colors hover:border-[#1f8f86] hover:text-[#1f8f86]">
           Manage
         </Link>
       </div>
